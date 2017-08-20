@@ -2,6 +2,10 @@ import matplotlib.image as mpimg
 import numpy as np
 import cv2
 from skimage.feature import hog
+from sklearn.svm import LinearSVC
+from sklearn.preprocessing import StandardScaler
+from skimage.feature import hog
+from sklearn.model_selection import train_test_split
 
 # Define a function to return HOG features and visualization
 def get_hog_features(img, orient, pix_per_cell, cell_per_block, 
@@ -229,6 +233,56 @@ def search_windows(img, windows, clf, scaler, color_space='RGB',
     #8) Return windows for positive detections
     return on_windows
 
+# Take care of false positives by applying heat map corrections
+
+def add_heat(heatmap, bbox_list):
+    # Iterate through list of bboxes
+    for box in bbox_list:
+        # Add += 1 for all pixels inside each bbox
+        # Assuming each "box" takes the form ((x1, y1), (x2, y2))
+        heatmap[box[0][1]:box[1][1], box[0][0]:box[1][0]] += 1
+
+    # Return updated heatmap
+    return heatmap# Iterate through list of bboxes
+    
+def apply_threshold(heatmap, threshold):
+    # Zero out pixels below the threshold
+    heatmap[heatmap <= threshold] = 0
+    # Return thresholded map
+    return heatmap
+
+def draw_labeled_bboxes(img, labels):
+    # Iterate through all detected cars
+    for car_number in range(1, labels[1]+1):
+        # Find pixels with each car_number label value
+        nonzero = (labels[0] == car_number).nonzero()
+        # Identify x and y values of those pixels
+        nonzeroy = np.array(nonzero[0])
+        nonzerox = np.array(nonzero[1])
+        # Define a bounding box based on min/max x and y
+        bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
+        # Draw the box on the image
+        cv2.rectangle(img, bbox[0], bbox[1], (0,0,255), 6)
+    # Return the image
+    return img
+
+# Create labels from given image by applying heat maps to list of candidate boxes
+def create_labels(image, box_list):
+    heat = np.zeros_like(image[:,:,0]).astype(np.float)
+
+    # Add heat to each box in box list
+    heat = add_heat(heat, box_list)
+    
+    # Apply threshold to help remove false positives
+    heat = apply_threshold(heat,1)
+
+    # Visualize the heatmap when displaying    
+    heatmap = np.clip(heat, 0, 255)
+
+    # Find final boxes from heatmap using label function
+    labels = label(heatmap)
+    return labels
+
 def convert_color(img, conv='RGB2YCrCb'):
     if conv == 'RGB2YCrCb':
         return cv2.cvtColor(img, cv2.COLOR_RGB2YCrCb)
@@ -303,52 +357,117 @@ def find_cars(img, ystart, ystop, scale, svc, X_scaler, orient, pix_per_cell, ce
                 
     return draw_img
 
-# Take care of false positives by applying heat map corrections
+import time
 
-def add_heat(heatmap, bbox_list):
-    # Iterate through list of bboxes
-    for box in bbox_list:
-        # Add += 1 for all pixels inside each bbox
-        # Assuming each "box" takes the form ((x1, y1), (x2, y2))
-        heatmap[box[0][1]:box[1][1], box[0][0]:box[1][0]] += 1
+def train_svm_classifier(cars, notcars):
+    color_space = 'LUV' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+    spatial_size = (32, 32)
+    hist_bins = 32
+    orient = 9
+    pix_per_cell = 8
+    cell_per_block = 2
+    hog_channel = 'ALL' # Can be 0, 1, 2, or "ALL"
+    spatial_feat = True
+    hist_feat = True
+    hog_feat = True
 
-    # Return updated heatmap
-    return heatmap# Iterate through list of bboxes
+    t=time.time()
+    car_features = extract_features(cars, 
+                                    color_space=color_space, 
+                                    spatial_size=spatial_size,
+                                    hist_bins=hist_bins,
+                                    orient=orient, 
+                                    pix_per_cell=pix_per_cell, 
+                                    cell_per_block=cell_per_block, 
+                                    hog_channel=hog_channel)
+    notcar_features = extract_features(notcars,
+                                       color_space=color_space, 
+                                       spatial_size=spatial_size,
+                                       hist_bins=hist_bins,
+                                       orient=orient, 
+                                       pix_per_cell=pix_per_cell, 
+                                       cell_per_block=cell_per_block, 
+                                       hog_channel=hog_channel)
     
-def apply_threshold(heatmap, threshold):
-    # Zero out pixels below the threshold
-    heatmap[heatmap <= threshold] = 0
-    # Return thresholded map
-    return heatmap
-
-def draw_labeled_bboxes(img, labels):
-    # Iterate through all detected cars
-    for car_number in range(1, labels[1]+1):
-        # Find pixels with each car_number label value
-        nonzero = (labels[0] == car_number).nonzero()
-        # Identify x and y values of those pixels
-        nonzeroy = np.array(nonzero[0])
-        nonzerox = np.array(nonzero[1])
-        # Define a bounding box based on min/max x and y
-        bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
-        # Draw the box on the image
-        cv2.rectangle(img, bbox[0], bbox[1], (0,0,255), 6)
-    # Return the image
-    return img
-
-# Create labels from given image by applying heat maps to list of candidate boxes
-def create_labels(image, box_list):
-    heat = np.zeros_like(image[:,:,0]).astype(np.float)
-
-    # Add heat to each box in box list
-    heat = add_heat(heat, box_list)
+    t2 = time.time()
+    print(round(t2-t, 2), 'Seconds to extract HOG features...')
+    # Create an array stack of feature vectors
+    X = np.vstack((car_features, notcar_features)).astype(np.float64)
     
-    # Apply threshold to help remove false positives
-    heat = apply_threshold(heat,1)
+    # Fit a per-column scaler
+    X_scaler = StandardScaler().fit(X)
+    # Apply the scaler to X
+    scaled_X = X_scaler.transform(X)
 
-    # Visualize the heatmap when displaying    
-    heatmap = np.clip(heat, 0, 255)
+    # Define the labels vector
+    y = np.hstack((np.ones(len(car_features)), np.zeros(len(notcar_features))))
 
-    # Find final boxes from heatmap using label function
-    labels = label(heatmap)
-    return labels
+
+    # Split up data into randomized training and test sets
+    rand_state = np.random.randint(0, 100)
+    X_train, X_test, y_train, y_test = train_test_split(
+        scaled_X, y, test_size=0.2, random_state=rand_state)
+
+    print('Using:',orient,'orientations',pix_per_cell,
+        'pixels per cell and', cell_per_block,'cells per block')
+    print('Feature vector length:', len(X_train[0]))
+    # Use a linear SVC 
+    svc = LinearSVC()
+    # Check the training time for the SVC
+    t=time.time()
+    svc.fit(X_train, y_train)
+    t2 = time.time()
+    print(round(t2-t, 2), 'Seconds to train SVC...')
+    # Check the score of the SVC
+    print('Test Accuracy of SVC = ', round(svc.score(X_test, y_test), 4))
+    # Check the prediction time for a single sample
+    t=time.time()
+    n_predict = len(y_test)
+    print('My SVC predicts: ', svc.predict(X_test[0:n_predict]))
+    print('For these',n_predict, 'labels: ', y_test[0:n_predict])
+    t2 = time.time()
+    print(round(t2-t, 5), 'Seconds to predict', n_predict,'labels with SVC')
+    return svc
+
+# Tests. No logic beyond this point.
+
+def test_extract_features(cars, notcars):
+    color_space = 'LUV' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+    spatial_size = (32, 32)
+    hist_bins = 32
+    orient = 9
+    pix_per_cell = 8
+    cell_per_block = 2
+    hog_channel = 'ALL' # Can be 0, 1, 2, or "ALL"
+    spatial_feat = True
+    hist_feat = True
+    hog_feat = True
+
+    car_features = extract_features(cars, 
+                                    color_space=color_space, 
+                                    spatial_size=spatial_size,
+                                    hist_bins=hist_bins,
+                                    orient=orient, 
+                                    pix_per_cell=pix_per_cell, 
+                                    cell_per_block=cell_per_block, 
+                                    hog_channel=hog_channel)
+    notcar_features = extract_features(notcars,
+                                       color_space=color_space, 
+                                       spatial_size=spatial_size,
+                                       hist_bins=hist_bins,
+                                       orient=orient, 
+                                       pix_per_cell=pix_per_cell, 
+                                       cell_per_block=cell_per_block, 
+                                       hog_channel=hog_channel)
+
+def test_train_svm_classifier(cars, notcars):    
+    svc = train_svm_classifier(cars, notcars)
+    
+if __name__ == '__main__':
+    cars = glob.glob('vehicles/*/*.png')
+    notcars = glob.glob('non-vehicles/*/*.png')
+    sample_size = 500
+    cars = cars[0:sample_size]
+    notcars = notcars[0:sample_size]
+    svc = test_train_svm_classifier(cars, notcars)
+
