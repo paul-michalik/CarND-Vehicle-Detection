@@ -1,6 +1,7 @@
 import matplotlib.image as mpimg
 import numpy as np
 import cv2
+import glob
 from skimage.feature import hog
 from sklearn.svm import LinearSVC
 from sklearn.preprocessing import StandardScaler
@@ -9,13 +10,13 @@ from sklearn.model_selection import train_test_split
 
 # Define a function to return HOG features and visualization
 def get_hog_features(img, orient, pix_per_cell, cell_per_block, 
-                        vis=False, feature_vec=True):
+                        vis=False, feature_vec=True, transform_sqrt=False):
     # Call with two outputs if vis==True
     if vis == True:
         features, hog_image = hog(img, orientations=orient, 
                                   pixels_per_cell=(pix_per_cell, pix_per_cell),
                                   cells_per_block=(cell_per_block, cell_per_block), 
-                                  transform_sqrt=True, 
+                                  transform_sqrt=transform_sqrt, 
                                   visualise=vis, feature_vector=feature_vec)
         return features, hog_image
     # Otherwise call with one output
@@ -23,7 +24,7 @@ def get_hog_features(img, orient, pix_per_cell, cell_per_block,
         features = hog(img, orientations=orient, 
                        pixels_per_cell=(pix_per_cell, pix_per_cell),
                        cells_per_block=(cell_per_block, cell_per_block), 
-                       transform_sqrt=True, 
+                       transform_sqrt=transform_sqrt, 
                        visualise=vis, feature_vector=feature_vec)
         return features
 
@@ -155,7 +156,7 @@ def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
 # Define a function to extract features from a single image window
 # This function is very similar to extract_features()
 # just for a single image rather than list of images
-def single_img_features(img, color_space='RGB', spatial_size=(32, 32),
+def extract_features_from_single_img(img, color_space='RGB', spatial_size=(32, 32),
                         hist_bins=32, orient=9, 
                         pix_per_cell=8, cell_per_block=2, hog_channel=0,
                         spatial_feat=True, hist_feat=True, hog_feat=True):    
@@ -217,7 +218,7 @@ def search_windows(img, windows, clf, scaler, color_space='RGB',
         #3) Extract the test window from original image
         test_img = cv2.resize(img[window[0][1]:window[1][1], window[0][0]:window[1][0]], (64, 64))      
         #4) Extract features for that window using single_img_features()
-        features = single_img_features(test_img, color_space=color_space, 
+        features = extract_features_from_single_img(test_img, color_space=color_space, 
                             spatial_size=spatial_size, hist_bins=hist_bins, 
                             orient=orient, pix_per_cell=pix_per_cell, 
                             cell_per_block=cell_per_block, 
@@ -431,6 +432,37 @@ def train_svm_classifier(cars, notcars):
 
 # Tests. No logic beyond this point.
 
+def test_get_hog_features(car_img, noncar_img):
+    orient = 9
+    pix_per_cell = 8
+    cell_per_block = 2
+    hog_channel = 'ALL' # Can be 0, 1, 2, or ALL
+
+    _, car_dst = get_hog_features(car_img[:,:,2], 
+                                  orient=orient, 
+                                  pix_per_cell=pix_per_cell, 
+                                  cell_per_block=cell_per_block, 
+                                  vis=True, 
+                                  feature_vec=True)
+    _, noncar_dst = get_hog_features(noncar_img[:,:,2],  
+                                  orient=orient, 
+                                  pix_per_cell=pix_per_cell, 
+                                  cell_per_block=cell_per_block, 
+                                  vis=True, 
+                                  feature_vec=True)
+
+    # Visualize 
+    f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(7,7))
+    f.subplots_adjust(hspace = .4, wspace=.2)
+    ax1.imshow(car_img)
+    ax1.set_title('Car Image', fontsize=16)
+    ax2.imshow(car_dst, cmap='gray')
+    ax2.set_title('Car HOG', fontsize=16)
+    ax3.imshow(noncar_img)
+    ax3.set_title('Non-Car Image', fontsize=16)
+    ax4.imshow(noncar_dst, cmap='gray')
+    ax4.set_title('Non-Car HOG', fontsize=16)
+
 def test_extract_features(cars, notcars):
     color_space = 'LUV' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
     spatial_size = (32, 32)
@@ -442,32 +474,16 @@ def test_extract_features(cars, notcars):
     spatial_feat = True
     hist_feat = True
     hog_feat = True
-
-    car_features = extract_features(cars, 
-                                    color_space=color_space, 
-                                    spatial_size=spatial_size,
-                                    hist_bins=hist_bins,
-                                    orient=orient, 
-                                    pix_per_cell=pix_per_cell, 
-                                    cell_per_block=cell_per_block, 
-                                    hog_channel=hog_channel)
-    notcar_features = extract_features(notcars,
-                                       color_space=color_space, 
-                                       spatial_size=spatial_size,
-                                       hist_bins=hist_bins,
-                                       orient=orient, 
-                                       pix_per_cell=pix_per_cell, 
-                                       cell_per_block=cell_per_block, 
-                                       hog_channel=hog_channel)
+    return None
 
 def test_train_svm_classifier(cars, notcars):    
-    svc = train_svm_classifier(cars, notcars)
-    
+    return None
+
 if __name__ == '__main__':
     cars = glob.glob('vehicles/*/*.png')
     notcars = glob.glob('non-vehicles/*/*.png')
-    sample_size = 500
-    cars = cars[0:sample_size]
-    notcars = notcars[0:sample_size]
-    svc = test_train_svm_classifier(cars, notcars)
+    
+    test_get_hog_features(mpimg.imread(cars[0]), mpimg.imread(notcars[0]))
+    test_get_hog_features(mpimg.imread(cars[5]), mpimg.imread(notcars[5]))
+    test_get_hog_features(mpimg.imread(cars[10]), mpimg.imread(notcars[10]))
 
