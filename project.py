@@ -498,48 +498,46 @@ if __name__ == '__main__':
     n_features_max = min(100, min(len(cars), len(notcars)))
     n_predict_max = min(50, n_features_max/2)
 
-    test_get_hog_features(mpimg.imread(cars[5]), mpimg.imread(notcars[5]))
+    #test_get_hog_features(mpimg.imread(cars[5]), mpimg.imread(notcars[5]))   
+
+    ## Feature extraction parameters 1
+    #args = FeatureExtractionArgs(colorspace = 'LUV', # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+    #                             orient = 9,
+    #                             pix_per_cell = 16,
+    #                             cell_per_block = 2,
+    #                             hog_channel = 'ALL') # Can be 0, 1, 2, or "ALL"
+
+    #test_FeatureExtraction_extract_feature_category(cars[0:n_features_max], 
+    #                                                notcars[0:n_features_max],
+    #                                                args)
+    #test_FeatureExtraction_extract_features(cars[0:n_features_max], 
+    #                                        notcars[0:n_features_max],
+    #                                        args)
+
+    #test_FeatureExtraction_prepare_features(cars[0:n_features_max], 
+    #                                        notcars[0:n_features_max],
+    #                                        args,
+    #                                        scale=False)
+
+
+    ## Feature extraction parameters 2  
+    #args = FeatureExtractionArgs(colorspace = 'YUV', # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+    #                             orient = 11,
+    #                             pix_per_cell = 16,
+    #                             cell_per_block = 2,
+    #                             hog_channel = 'ALL') # Can be 0, 1, 2, or "ALL"
     
+    #test_FeatureExtraction_extract_feature_category(cars[0:n_features_max], 
+    #                                                notcars[0:n_features_max],
+    #                                                args)
+    #test_FeatureExtraction_extract_features(cars[0:n_features_max], 
+    #                                        notcars[0:n_features_max],
+    #                                        args)
 
-    # Feature extraction parameters 1
-    args = FeatureExtractionArgs(colorspace = 'LUV', # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
-                                 orient = 9,
-                                 pix_per_cell = 16,
-                                 cell_per_block = 2,
-                                 hog_channel = 'ALL') # Can be 0, 1, 2, or "ALL"
-
-    test_FeatureExtraction_extract_feature_category(cars[0:n_features_max], 
-                                                    notcars[0:n_features_max],
-                                                    args)
-    test_FeatureExtraction_extract_features(cars[0:n_features_max], 
-                                            notcars[0:n_features_max],
-                                            args)
-
-    test_FeatureExtraction_prepare_features(cars[0:n_features_max], 
-                                            notcars[0:n_features_max],
-                                            args,
-                                            scale=False)
-
-
-    # Feature extraction parameters 2  
-    args = FeatureExtractionArgs(colorspace = 'YUV', # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
-                                 orient = 11,
-                                 pix_per_cell = 16,
-                                 cell_per_block = 2,
-                                 hog_channel = 'ALL') # Can be 0, 1, 2, or "ALL"
-    
-    test_FeatureExtraction_extract_feature_category(cars[0:n_features_max], 
-                                                    notcars[0:n_features_max],
-                                                    args)
-    test_FeatureExtraction_extract_features(cars[0:n_features_max], 
-                                            notcars[0:n_features_max],
-                                            args)
-
-    test_FeatureExtraction_prepare_features(cars[0:n_features_max], 
-                                            notcars[0:n_features_max],
-                                            args,
-                                            scale=True)
-
+    #test_FeatureExtraction_prepare_features(cars[0:n_features_max], 
+    #                                        notcars[0:n_features_max],
+    #                                        args,
+    #                                        scale=True)
 
     feat_ext = FeatureExtraction(FeatureExtractionArgs(colorspace = 'YUV',
                                                        orient = 11,
@@ -549,14 +547,14 @@ if __name__ == '__main__':
     feat_ext.extract_features(cars, notcars)
     feat_ext.prepare_features(scale=True)
     
-    test_FeatureClassification_train_classifier(feat_ext, n_predict = min(n_features_max, 10))
+    #test_FeatureClassification_train_classifier(feat_ext, n_predict = min(n_features_max, 10))
 
     # classifier
     feat_class = FeatureClassification(feat_ext)
     feat_class.train_classifier()
 
     # Trivial function test
-    test_FeatureClassification_with_trained_classifier(feat_class, n_predict = min(n_features_max, 10))
+    #test_FeatureClassification_with_trained_classifier(feat_class, n_predict = min(n_features_max, 10))
 
     # find_cars 1
     test_FeatureClassification_find_cars_single_image(mpimg.imread('./test_images/test1.jpg'), 
@@ -572,12 +570,12 @@ if __name__ == '__main__':
                                                       ystop = 656,
                                                       scale = 1.5)
 
-    for file_name in glob.glob('./test_images/test*.jpg'):
-        test_FeatureClassification_find_cars_and_draw_boxes_single_image(mpimg.imread(file_name), 
-                                                          feat_class,
-                                                          ystart = 400,
-                                                          ystop = 656,
-                                                          scale = 1.5)
+    #for file_name in glob.glob('./test_images/test*.jpg'):
+    #    test_FeatureClassification_find_cars_and_draw_boxes_single_image(mpimg.imread(file_name), 
+    #                                                      feat_class,
+    #                                                      ystart = 400,
+    #                                                      ystop = 656,
+    #                                                      scale = 1.5)
 
     test_FeatureClassification_find_cars_multi_scale_single_image(mpimg.imread('./test_images/test1.jpg'), feat_class, xstart=6)
 
