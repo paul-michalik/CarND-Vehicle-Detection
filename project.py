@@ -632,3 +632,5 @@ if __name__ == '__main__':
                                                           feat_class,
                                                           xstart=6)
     test_FeatureClassification_find_cars_multiscale_auto(mpimg.imread('./test_images/test1.jpg'), feat_class, xstart=6)
+
+    test_FeatureClassification_heat_map(mpimg.imread('./test_images/test1.jpg'), feat_class, xstart=6)
