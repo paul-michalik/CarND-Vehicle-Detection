@@ -136,8 +136,22 @@ class FeatureClassification:
 
         return find_cars(img=image, xstart=xstart, ystart=ystart, ystop=ystop, scale=scale, cspace=cspace, hog_channel=hog_channel, svc=svc, X_scaler=X_scaler, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, spatial_size=spatial_size,hist_bins=hist_bins, show_all_rectangles=show_all_rectangles)
 
-    def find_cars_and_store_boxes(self, image, ystart, ystop, scale, classifier='LinearSVC', show_all_rectangles=False):
-        self.boxes.extend(self.find_cars(image, ystart, ystop, scale, classifier, show_all_rectangles))
+    def find_cars_multiscale(self, image, xstart=0):
+        boxes = []
+        for ystart, ystop, scale in [(400, 464, 1.0), 
+                                     (416, 480, 1.0), 
+                                     (400, 496, 1.5), 
+                                     (432, 528, 1.5), 
+                                     (400, 528, 2.0), 
+                                     (432, 560, 2.0), 
+                                     (400, 596, 3.5), 
+                                     (464, 660, 3.5)]:
+             boxes.extend(list(self.find_cars(image, 
+                                  xstart=xstart, 
+                                  ystart=ystart, 
+                                  ystop=ystop, 
+                                  scale=scale)))
+        return boxes
 
 # Define a function to return HOG features and visualization
 def get_hog_features(img, orient, pix_per_cell, cell_per_block, 
@@ -344,6 +358,16 @@ def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
     # Return the image copy with boxes drawn
     return imcopy
 
+def add_heat(heatmap, bbox_list):
+    # Iterate through list of bboxes
+    for box in bbox_list:
+        # Add += 1 for all pixels inside each bbox
+        # Assuming each "box" takes the form ((x1, y1), (x2, y2))
+        heatmap[box[0][1]:box[1][1], box[0][0]:box[1][0]] += 1
+
+    # Return updated heatmap
+    return heatmap
+
 
 # Tests. No logic beyond this point.
 
@@ -474,9 +498,9 @@ def test_FeatureClassification_find_cars_and_draw_boxes_single_image(test_image,
     plt.imshow(test_img_rects)
     plt.show()
 
-def test_FeatureClassification_find_cars_multi_scale_single_image(test_image, 
-                                                                  feat_class = FeatureClassification(), 
-                                                                  xstart=0):
+def test_FeatureClassification_find_cars_multiscale(test_image, 
+                                                    feat_class = FeatureClassification(), 
+                                                    xstart=0):
 
     rectangles = []
     for ystart, ystop, scale in [(400, 464, 1.0), (416, 480, 1.0), (400, 496, 1.5), (432, 528, 1.5), (400, 528, 2.0), (432, 560, 2.0), (400, 596, 3.5), (464, 660, 3.5)]:
@@ -490,6 +514,23 @@ def test_FeatureClassification_find_cars_multi_scale_single_image(test_image,
     test_img_rects = draw_boxes(test_image, rectangles, color=(0, 0, 255), thick=2)
     plt.figure(figsize=(10,10))
     plt.imshow(test_img_rects)
+
+def test_FeatureClassification_find_cars_multiscale_auto(test_image, 
+                                                     feat_class = FeatureClassification(),
+                                                     xstart=0):
+    boxes = feat_class.find_cars_multiscale(test_image, xstart=xstart)
+    print('{} boxes total, found in image'.format(len(boxes)))
+
+    test_img_rects = draw_boxes(test_image, boxes, color=(0, 0, 255), thick=2)
+    plt.figure(figsize=(10,10))
+    plt.imshow(test_img_rects)
+
+def test_FeatureClassification_heat_map(test_img, feat_class = FeatureClassification(), xstart=0):
+    heatmap_img = np.zeros_like(test_img[:,:,0])
+    heatmap_img = add_heat(heatmap_img, feat_class.find_cars_multiscale(test_img, xstart=xstart))
+    plt.figure(figsize=(10,10))
+    plt.imshow(heatmap_img, cmap='hot')
+
 
 if __name__ == '__main__':
     cars = glob.glob('vehicles/*/*.png')
@@ -570,7 +611,6 @@ if __name__ == '__main__':
                                                       ystart = 400,
                                                       ystop = 656,
                                                       scale = 1.5)
-
     
     test_FeatureClassification_find_cars_and_draw_boxes_single_image(mpimg.imread('./test_images/test1.jpg'), 
                                                       feat_class,
@@ -585,9 +625,10 @@ if __name__ == '__main__':
     #                                                      ystop = 656,
     #                                                      scale = 1.5)
 
-    test_FeatureClassification_find_cars_multi_scale_single_image(mpimg.imread('./test_images/test1.jpg'), feat_class, xstart=6)
+    test_FeatureClassification_find_cars_multiscale(mpimg.imread('./test_images/test1.jpg'), feat_class, xstart=6)
 
     for file_name in glob.glob('./test_images/test*.jpg'):
-        test_FeatureClassification_find_cars_multi_scale_single_image(mpimg.imread(file_name), 
+        test_FeatureClassification_find_cars_multiscale(mpimg.imread(file_name), 
                                                           feat_class,
                                                           xstart=6)
+    test_FeatureClassification_find_cars_multiscale_auto(mpimg.imread('./test_images/test1.jpg'), feat_class, xstart=6)
