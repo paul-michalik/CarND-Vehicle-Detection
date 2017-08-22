@@ -17,9 +17,9 @@ class FeatureExtractionArgs:
     hog_channel = None
     spatial_size = None
     hist_bins = None  
-    spatial_feat = None 
-    hist_feat = None 
-    hog_feat = None
+    use_spatial_feat = None 
+    use_hist_feat = None 
+    use_hog_feat = None
 
     def __init__(self,
                  colorspace = 'YUV', # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
@@ -29,9 +29,9 @@ class FeatureExtractionArgs:
                  hog_channel = 'ALL', # Can be 0, 1, 2, or "ALL"
                  spatial_size=(32, 32),
                  hist_bins=32,
-                 spatial_feat=False, 
-                 hist_feat=False, 
-                 hog_feat=True):
+                 use_spatial_feat=False, 
+                 use_hist_feat=False, 
+                 use_hog_feat=True):
         self.colorspace = colorspace
         self.orient = orient
         self.pix_per_cell = pix_per_cell
@@ -39,9 +39,95 @@ class FeatureExtractionArgs:
         self.hog_channel = hog_channel
         self.spatial_size = spatial_size
         self.hist_bins=hist_bins  
-        self.spatial_feat = spatial_feat 
-        self.hist_feat = hist_feat 
-        self.hog_feat = hog_feat
+        self.use_spatial_feat = use_spatial_feat 
+        self.use_hist_feat = use_hist_feat 
+        self.use_hog_feat = use_hog_feat
+
+class FeatureExtraction:
+    args = FeatureExtractionArgs()
+    car_features = None
+    noncar_features = None
+    X_train = None 
+    X_test = None
+    y_train = None
+    y_test = None
+    X_scaler = None
+    classifier = None
+
+    def __init__(self, args = FeatureExtractionArgs()):
+        self.args = args
+
+    def extract_feature_category(self, image_files):
+        return extract_features(imgs=image_files, 
+                                color_space=self.args.colorspace,
+                                orient=self.args.orient,
+                                pix_per_cell=self.args.pix_per_cell,
+                                cell_per_block=self.args.cell_per_block,
+                                hog_channel=self.args.hog_channel,
+                                spatial_size=self.args.spatial_size,
+                                hist_bins=self.args.hist_bins,
+                                spatial_feat=self.args.use_spatial_feat,
+                                hist_feat=self.args.use_hist_feat,
+                                hog_feat=self.args.use_hog_feat)
+
+    def extract_features(self, car_image_files, notcar_image_files):
+        car_features = self.extract_feature_category(car_image_files)
+        noncar_features = self.extract_feature_category(notcar_image_files)
+        self.car_features, self.noncar_features = car_features, noncar_features
+
+
+    def save_features(filename):
+        return None
+
+    def load_features(filename):
+        return None
+
+    def prepare_features(self, scale=True):
+        # Create an array stack of feature vectors
+        X = np.vstack((self.car_features, self.noncar_features)).astype(np.float64) 
+
+        if scale == True:
+            # Fit a per-column scaler
+            X_scaler = StandardScaler().fit(X)
+            # Apply the scaler to X
+            scaled_X = X_scaler.transform(X)
+        else:
+            scaled_X = X
+
+        # Define the labels vector
+        y = np.hstack((np.ones(len(self.car_features)), np.zeros(len(self.noncar_features))))
+
+        # Split up data into randomized training and test sets
+        X_train, X_test, y_train, y_test = train_test_split(
+            scaled_X, y, test_size=0.2, random_state=0)
+
+        self.X_train = X_train
+        self.X_test = X_test
+        self.y_train = y_train
+        self.y_test = y_test
+                
+        if scale == True:
+            self.X_scaler = X_scaler
+
+class FeatureClassification:
+    classifier = None
+    features = FeatureExtraction()
+    boxes = []
+
+    def __init__(self, features = None):
+        self.features = features
+
+    def train_classifier(self, classifier='LinearSVC'):
+        if classifier in 'LinearSVC':
+            svc = LinearSVC().fit(self.features.X_train, self.features.y_train)
+            self.classifier = svc
+        # add other alternatives
+
+    def find_cars(self, image, ystart, ystop, scale, classifier='LinearSVC', show_all_rectangles=False):
+        return find_cars(img=image, ystart=ystart, ystop=ystop, scale=scale)
+
+    def find_cars_and_store_boxes(self, image, ystart, ystop, scale, classifier='LinearSVC', show_all_rectangles=False):
+        self.boxes.extend(self.find_cars(image, ystart, ystop, scale, classifier, show_all_rectangles))
 
 # Define a function to return HOG features and visualization
 def get_hog_features(img, orient, pix_per_cell, cell_per_block, 
@@ -138,64 +224,6 @@ def extract_features(imgs,
     # Return list of feature vectors
     return features
 
-def extract_features_shuffle_and_split(car_images, noncar_images, args):
-    # Feature extraction parameters
-    colorspace = args.colorspace
-    orient = args.orient
-    pix_per_cell = args.pix_per_cell#
-    cell_per_block = args.cell_per_block
-    hog_channel = args.hog_channel
-
-    t = time.time()
-    car_features = extract_features(car_images, 
-                                    color_space=colorspace, 
-                                    orient=orient, 
-                                    pix_per_cell=pix_per_cell, 
-                                    cell_per_block=cell_per_block, 
-                                    hog_channel=hog_channel,
-                                    spatial_feat=False,
-                                    hist_feat=False)
-    notcar_features = extract_features(noncar_images,
-                                       color_space=colorspace, 
-                                       orient=orient, 
-                                       pix_per_cell=pix_per_cell, 
-                                       cell_per_block=cell_per_block, 
-                                       hog_channel=hog_channel,
-                                       spatial_feat=False,
-                                       hist_feat=False)
-    t2 = time.time()
-    print(round(t2-t, 2), 'Seconds to extract HOG features...')
-    # Create an array stack of feature vectors
-    X = np.vstack((car_features, notcar_features)).astype(np.float64)  
-
-    # Fit a per-column scaler
-    X_scaler = StandardScaler().fit(X)
-    # Apply the scaler to X
-    scaled_X = X_scaler.transform(X)
-
-    # Define the labels vector
-    y = np.hstack((np.ones(len(car_features)), np.zeros(len(notcar_features))))
-
-    # Split up data into randomized training and test sets
-    rand_state = np.random.randint(0, 100)
-    X_train, X_test, y_train, y_test = train_test_split(
-        scaled_X, y, test_size=0.2, random_state=rand_state)
-
-    return X_train, X_test, y_train, y_test, X_scaler
-
-def train_classifier(X_train, X_test, y_train, y_test, n_predict=10):
-    svc = LinearSVC()
-    svc.fit(X_train, y_train)
-    return svc
-
-def create_and_train_classifier(car_images, noncar_images, args):
-    X_train, X_test, y_train, y_test, X_scaler = \
-        extract_features_shuffle_and_split(car_images,
-                                           noncar_images,
-                                           args)
-    svc = train_classifier(X_train, X_test, y_train, y_test)
-
-    return svc, X_scaler 
 
 # Define a single function that can extract features using hog sub-sampling and make predictions
 def find_cars(img, ystart, ystop, scale, cspace, hog_channel, svc, X_scaler, orient, 
@@ -285,13 +313,29 @@ def find_cars(img, ystart, ystop, scale, cspace, hog_channel, svc, X_scaler, ori
                 xbox_left = np.int(xleft*scale)
                 ytop_draw = np.int(ytop*scale)
                 win_draw = np.int(window*scale)
-                rectangles.append(((xbox_left, ytop_draw+ystart),(xbox_left+win_draw,ytop_draw+win_draw+ystart)))
+                yield ((xbox_left, ytop_draw+ystart),(xbox_left+win_draw,ytop_draw+win_draw+ystart))
+                #rectangles.append(((xbox_left, ytop_draw+ystart),(xbox_left+win_draw,ytop_draw+win_draw+ystart)))
                 
-    return rectangles
+    #return rectangles
+
+def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
+    # Make a copy of the image
+    imcopy = np.copy(img)
+    random_color = False
+    # Iterate through the bounding boxes
+    for bbox in bboxes:
+        if color == 'random' or random_color:
+            color = (np.random.randint(0,255), np.random.randint(0,255), np.random.randint(0,255))
+            random_color = True
+        # Draw a rectangle given bbox coordinates
+        cv2.rectangle(imcopy, bbox[0], bbox[1], color, thick)
+    # Return the image copy with boxes drawn
+    return imcopy
+
 
 # Tests. No logic beyond this point.
 
-def test_get_hog_features(car_img, noncar_img):
+def test_get_hog_features(car_img, noncar_img, figsize=(7,7), fontsize=16):
     orient = 9
     pix_per_cell = 8
     cell_per_block = 2
@@ -309,7 +353,7 @@ def test_get_hog_features(car_img, noncar_img):
                                   feature_vec=True)
 
     # Visualize 
-    f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(14,14))
+    f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=figsize)
     f.subplots_adjust(hspace = .4, wspace=.2)
     ax1.imshow(car_img)
     ax1.set_title('Car Image', fontsize=16)
@@ -319,66 +363,177 @@ def test_get_hog_features(car_img, noncar_img):
     ax3.set_title('Non-Car Image', fontsize=16)
     ax4.imshow(noncar_dst, cmap='gray')
     ax4.set_title('Non-Car HOG', fontsize=16)
+    plt.show()
 
-def test_extract_features_shuffle_and_split(car_images, noncar_images, args):
-    X_train, X_test, y_train, y_test = extract_features_shuffle_and_split(car_images, noncar_images, args)
+def test_FeatureExtraction_extract_feature_category(car_images, noncar_images, args = FeatureExtractionArgs()):
 
-    print('Using:',orient,'orientations',pix_per_cell,
-        'pixels per cell and', cell_per_block,'cells per block')
-    print('Feature vector length:', len(X_train[0]))
+    t = time.time();
+    feat_ext = FeatureExtraction(args)
+    car_features = feat_ext.extract_feature_category(car_images)
+    noncar_features = feat_ext.extract_feature_category(noncar_images)
 
-def test_train_classifier(cars, notcars, args, n_predict=10):
-    X_train, X_test, y_train, y_test = extract_features_shuffle_and_split(cars, 
-                                                                          notcars, 
-                                                                          args)
+    print('Using {} orientations, {} pixels per cell and {} cells per block'.format(feat_ext.args.orient,
+                                                                                    feat_ext.args.pix_per_cell,
+                                                                                    feat_ext.args.cell_per_block))
 
-    t = time.time()
-    svc = train_classifier(X_train, X_test, y_train, y_test, n_predict)
-    print(round(time.time()-t, 2), 'Seconds to train SVC...')
+    print('Feature vector length cars = {}, non cars = {}'.format(len(car_features), 
+                                                                  len(noncar_features)))
+
+    print('time spent: {:.2f} s'.format(time.time() - t))
+
+def test_FeatureExtraction_extract_features(car_images, noncar_images, args = FeatureExtractionArgs()):
+
+    t = time.time();
+    feat_ext = FeatureExtraction(args)
+    feat_ext.extract_features(car_images, noncar_images)
+
+    print('Using {} orientations, {} pixels per cell and {} cells per block'.format(feat_ext.args.orient,
+                                                                                    feat_ext.args.pix_per_cell,
+                                                                                    feat_ext.args.cell_per_block))
+
+    print('Feature vector length cars = {}, non cars = {}'.format(len(feat_ext.car_features), 
+                                                                  len(feat_ext.noncar_features)))
+
+    print('time spent: {:.2f} s'.format(time.time() - t))
+
+def test_FeatureExtraction_prepare_features(car_images, noncar_images, args = FeatureExtractionArgs(), scale = True):
+    t = time.time();
+
+    feat_ext = FeatureExtraction(args)
+    feat_ext.extract_features(car_images, noncar_images)
+    feat_ext.prepare_features(scale = scale)
+
+    print('Using {} orientations, {} pixels per cell and {} cells per block'.format(feat_ext.args.orient,
+                                                                                    feat_ext.args.pix_per_cell,
+                                                                                    feat_ext.args.cell_per_block))
+
+    print('shapes: X_train, X_test, y_train, y_test'.format(np.shape(feat_ext.X_train),
+                                                    np.shape(feat_ext.X_test),
+                                                    np.shape(feat_ext.y_train),
+                                                    np.shape(feat_ext.y_test)))
+
+    print('time spent: {:.2f} s'.format(time.time() - t))
+
+def test_FeatureClassification_train_classifier(feat_ext = FeatureExtraction(), n_predict=10):
+    X_test, y_test = feat_ext.X_test, feat_ext.y_test
+
+    t = time.time();
+    feat_class = FeatureClassification(feat_ext)
+    feat_class.train_classifier('LinearSVC')
+    print('time spent for training: {:.2f} s'.format(time.time() - t))
 
     # Check the score of the SVC
-    print('Test Accuracy of SVC = ', round(svc.score(X_test, y_test), 4))
+    print('Test Accuracy = {:.2f}'.format(feat_class.classifier.score(X_test, y_test)))
+
     # Check the prediction time for a single sample
     t=time.time()
-    print('Predicts: ', svc.predict(X_test[0:n_predict]))
-    print('For these',n_predict, 'labels: ', y_test[0:n_predict])
-    print(round(time.time()-t, 5), 'Seconds to predict', n_predict,'labels with SVC')
+    print('predicted labels:\n', feat_class.classifier.predict(X_test[0:n_predict]))
+    print('test labels     :\n', y_test[0:n_predict])
+    print('time spent for prediction: {:.2f} s'.format(time.time() - t))
+
+def test_FeatureClassification_with_trained_classifier(feat_class = FeatureClassification(), n_predict=10):
+     
+    X_test, y_test = feat_class.features.X_test, feat_ext.features.y_test
+
+    # Check the score of the SVC
+    print('Test Accuracy = {:.2f}'.format(feat_class.classifier.score(X_test, y_test)))
+
+    # Check the prediction time for a single sample
+    print('predicted labels:\n', feat_class.classifier.predict(X_test[0:n_predict]))
+    print('test labels     :\n', y_test[0:n_predict])
+
+def test_FeatureClassification_find_cars_single_image(test_image, 
+                                                      feat_class = FeatureClassification(), 
+                                                      ystart = 400, 
+                                                      ystop = 656, 
+                                                      scale = 1.5):
+    feat_class.find_cars(test_image, ystart=ystart, ystop=ystop, scale=scale)
+
+    print(len(rectangles), 'rectangles found in image')
+
+def test_FeatureClassification_find_cars_single_image(test_image, feat_class = FeatureClassification()):
+    ystart = 400
+    ystop = 656
+    scale = 1.5
+    colorspace = 'YUV' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+    orient = 11
+    pix_per_cell = 16
+    cell_per_block = 2
+    hog_channel = 'ALL' # Can be 0, 1, 2, or "ALL"
+
+    rectangles = find_cars(test_img, ystart, ystop, scale, colorspace, hog_channel, svc, None, orient, pix_per_cell, cell_per_block, None, None)
+
+    print(len(rectangles), 'rectangles found in image')
 
 if __name__ == '__main__':
     cars = glob.glob('vehicles/*/*.png')
     notcars = glob.glob('non-vehicles/*/*.png')
     
-    #test_get_hog_features(mpimg.imread(cars[5]), mpimg.imread(notcars[5]))
+    n_features_max = min(100, min(len(cars), len(notcars)))
+    n_predict_max = min(50, n_features_max/2)
+
+    test_get_hog_features(mpimg.imread(cars[5]), mpimg.imread(notcars[5]))
     
-    ## Feature extraction parameters 1
-    #args = FeatureExtractionArgs(colorspace = 'LUV', # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
-    #                             orient = 9,
-    #                             pix_per_cell = 16,
-    #                             cell_per_block = 2,
-    #                             hog_channel = 'ALL') # Can be 0, 1, 2, or "ALL"
-    #test_extract_features_shuffle_and_split(cars[0:min(500, len(cars))], 
-    #                                        notcars[0:min(500, len(notcars))], 
-    #                                        args)
 
-    ## Feature extraction parameters 2  
-    #args = FeatureExtractionArgs(colorspace = 'YUV', # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
-    #                             orient = 11,
-    #                             pix_per_cell = 16,
-    #                             cell_per_block = 2,
-    #                             hog_channel = 'ALL') # Can be 0, 1, 2, or "ALL"
-    #test_extract_features_shuffle_and_split(cars[0:100], notcars[0:100], args)
+    # Feature extraction parameters 1
+    args = FeatureExtractionArgs(colorspace = 'LUV', # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+                                 orient = 9,
+                                 pix_per_cell = 16,
+                                 cell_per_block = 2,
+                                 hog_channel = 'ALL') # Can be 0, 1, 2, or "ALL"
 
+    test_FeatureExtraction_extract_feature_category(cars[0:n_features_max], 
+                                                    notcars[0:n_features_max],
+                                                    args)
+    test_FeatureExtraction_extract_features(cars[0:n_features_max], 
+                                            notcars[0:n_features_max],
+                                            args)
+
+    test_FeatureExtraction_prepare_features(cars[0:n_features_max], 
+                                            notcars[0:n_features_max],
+                                            args,
+                                            scale=False)
+
+
+    # Feature extraction parameters 2  
     args = FeatureExtractionArgs(colorspace = 'YUV', # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
                                  orient = 11,
                                  pix_per_cell = 16,
                                  cell_per_block = 2,
-                                 hog_channel = 'ALL') # Can be 0, 1, 2, or "ALL"    
-    test_train_classifier(cars[0:min(1000, len(cars))],
-                          notcars[0:min(1000, len(notcars))],
-                          args,
-                          n_predict=100)
+                                 hog_channel = 'ALL') # Can be 0, 1, 2, or "ALL"
+    
+    test_FeatureExtraction_extract_feature_category(cars[0:n_features_max], 
+                                                    notcars[0:n_features_max],
+                                                    args)
+    test_FeatureExtraction_extract_features(cars[0:n_features_max], 
+                                            notcars[0:n_features_max],
+                                            args)
 
-    #test_train_classifier(cars,
-    #                      notcars,
-    #                      args,
-    #                      n_predict=100)
+    test_FeatureExtraction_prepare_features(cars[0:n_features_max], 
+                                            notcars[0:n_features_max],
+                                            args,
+                                            scale=True)
+
+
+    feat_ext = FeatureExtraction(FeatureExtractionArgs(colorspace = 'YUV',
+                                                       orient = 11,
+                                                       pix_per_cell = 16,
+                                                       cell_per_block = 2,
+                                                       hog_channel = 'ALL'))
+    feat_ext.extract_features(cars, notcars)
+    feat_ext.prepare_features(scale=True)
+    
+    test_FeatureClassification_train_classifier(feat_ext, n_predict = min(n_features_max, 10))
+
+    # classifier
+    feat_class = FeatureClassification(feat_ext)
+    feat_class.train_classifier()
+    # Trivial function test
+    test_FeatureClassification_with_trained_classifier(feat_class, n_predict = min(n_features_max, 10))
+    # find_cars
+    test_FeatureClassification_find_cars_single_image(mpimg.imread('./test_images/test1.jpg'), 
+                                                      feat_class,
+                                                      ystart = 400,
+                                                      ystop = 656,
+                                                      scale = 1.5)
+
