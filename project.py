@@ -472,6 +472,20 @@ def test_FeatureClassification_find_cars_and_draw_boxes_single_image(test_image,
     plt.imshow(test_img_rects)
     plt.show()
 
+def test_FeatureClassification_find_cars_multi_scale_single_image(test_image,                                                                                                              feat_class = FeatureClassification()):
+
+    rectangles = []
+    for ystart, ystop, scale in [(400, 464, 1.0), (416, 480, 1.0), (400, 496, 1.5), (432, 528, 1.5), (400, 528, 2.0), (432, 560, 2.0), (400, 596, 3.5), (464, 660, 3.5)]:
+        cur_rectangles = list(feat_class.find_cars(test_image, ystart, ystop, scale))
+        print('{} rectangles found in image for ystart = {}, ystop = {}, scale = {}'.format(len(cur_rectangles),
+                                                                                            ystart,
+                                                                                            ystop, 
+                                                                                            scale))
+        rectangles.extend(cur_rectangles)
+
+    test_img_rects = draw_boxes(test_image, rectangles, color=(0, 0, 255), thick=2)
+    plt.figure(figsize=(10,10))
+    plt.imshow(test_img_rects)
 
 if __name__ == '__main__':
     cars = glob.glob('vehicles/*/*.png')
@@ -561,3 +575,4 @@ if __name__ == '__main__':
                                                           ystop = 656,
                                                           scale = 1.5)
 
+    test_FeatureClassification_find_cars_multi_scale_single_image(mpimg.imread('./test_images/test1.jpg'), feat_class)
