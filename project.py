@@ -169,9 +169,9 @@ def extract_features_shuffle_and_split(car_images, noncar_images, args):
     X = np.vstack((car_features, notcar_features)).astype(np.float64)  
 
     # Fit a per-column scaler
-    #X_scaler = StandardScaler().fit(X)
+    X_scaler = StandardScaler().fit(X)
     # Apply the scaler to X
-    #scaled_X = X_scaler.transform(X)
+    scaled_X = X_scaler.transform(X)
 
     # Define the labels vector
     y = np.hstack((np.ones(len(car_features)), np.zeros(len(notcar_features))))
@@ -179,19 +179,28 @@ def extract_features_shuffle_and_split(car_images, noncar_images, args):
     # Split up data into randomized training and test sets
     rand_state = np.random.randint(0, 100)
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=rand_state)
+        scaled_X, y, test_size=0.2, random_state=rand_state)
 
-    return X_train, X_test, y_train, y_test
+    return X_train, X_test, y_train, y_test, X_scaler
 
 def train_classifier(X_train, X_test, y_train, y_test, n_predict=10):
     svc = LinearSVC()
     svc.fit(X_train, y_train)
     return svc
 
+def create_and_train_classifier(car_images, noncar_images, args):
+    X_train, X_test, y_train, y_test, X_scaler = \
+        extract_features_shuffle_and_split(car_images,
+                                           noncar_images,
+                                           args)
+    svc = train_classifier(X_train, X_test, y_train, y_test)
+
+    return svc, X_scaler 
+
 # Define a single function that can extract features using hog sub-sampling and make predictions
 def find_cars(img, ystart, ystop, scale, cspace, hog_channel, svc, X_scaler, orient, 
               pix_per_cell, cell_per_block, spatial_size, hist_bins, show_all_rectangles=False):
-    
+
     # array of rectangles where cars were detected
     rectangles = []
     
