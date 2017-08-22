@@ -124,7 +124,17 @@ class FeatureClassification:
         # add other alternatives
 
     def find_cars(self, image, ystart, ystop, scale, classifier='LinearSVC', show_all_rectangles=False):
-        return find_cars(img=image, ystart=ystart, ystop=ystop, scale=scale)
+        cspace=self.features.args.colorspace
+        hog_channel=self.features.args.hog_channel
+        svc = self.classifier
+        X_scaler = self.features.X_scaler
+        orient=self.features.args.orient
+        pix_per_cell=self.features.args.pix_per_cell
+        cell_per_block=self.features.args.cell_per_block
+        spatial_size=self.features.args.spatial_size
+        hist_bins=self.features.args.hist_bins
+
+        return find_cars(img=image, ystart=ystart, ystop=ystop, scale=scale, cspace=cspace, hog_channel=hog_channel, svc=svc, X_scaler=X_scaler, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, spatial_size=spatial_size,hist_bins=hist_bins, show_all_rectangles=show_all_rectangles)
 
     def find_cars_and_store_boxes(self, image, ystart, ystop, scale, classifier='LinearSVC', show_all_rectangles=False):
         self.boxes.extend(self.find_cars(image, ystart, ystop, scale, classifier, show_all_rectangles))
@@ -433,7 +443,7 @@ def test_FeatureClassification_train_classifier(feat_ext = FeatureExtraction(), 
 
 def test_FeatureClassification_with_trained_classifier(feat_class = FeatureClassification(), n_predict=10):
      
-    X_test, y_test = feat_class.features.X_test, feat_ext.features.y_test
+    X_test, y_test = feat_class.features.X_test, feat_class.features.y_test
 
     # Check the score of the SVC
     print('Test Accuracy = {:.2f}'.format(feat_class.classifier.score(X_test, y_test)))
@@ -447,23 +457,21 @@ def test_FeatureClassification_find_cars_single_image(test_image,
                                                       ystart = 400, 
                                                       ystop = 656, 
                                                       scale = 1.5):
-    feat_class.find_cars(test_image, ystart=ystart, ystop=ystop, scale=scale)
-
+    rectangles = list(feat_class.find_cars(test_image, ystart=ystart, ystop=ystop, scale=scale))
     print(len(rectangles), 'rectangles found in image')
 
-def test_FeatureClassification_find_cars_single_image(test_image, feat_class = FeatureClassification()):
-    ystart = 400
-    ystop = 656
-    scale = 1.5
-    colorspace = 'YUV' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
-    orient = 11
-    pix_per_cell = 16
-    cell_per_block = 2
-    hog_channel = 'ALL' # Can be 0, 1, 2, or "ALL"
-
-    rectangles = find_cars(test_img, ystart, ystop, scale, colorspace, hog_channel, svc, None, orient, pix_per_cell, cell_per_block, None, None)
-
+def test_FeatureClassification_find_cars_and_draw_boxes_single_image(test_image, 
+                                                      feat_class = FeatureClassification(), 
+                                                      ystart = 400, 
+                                                      ystop = 656, 
+                                                      scale = 1.5):
+    rectangles = list(feat_class.find_cars(test_image, ystart=ystart, ystop=ystop, scale=scale))
     print(len(rectangles), 'rectangles found in image')
+    test_img_rects = draw_boxes(test_image, rectangles)
+    plt.figure(figsize=(10,10))
+    plt.imshow(test_img_rects)
+    plt.show()
+
 
 if __name__ == '__main__':
     cars = glob.glob('vehicles/*/*.png')
@@ -528,12 +536,28 @@ if __name__ == '__main__':
     # classifier
     feat_class = FeatureClassification(feat_ext)
     feat_class.train_classifier()
+
     # Trivial function test
     test_FeatureClassification_with_trained_classifier(feat_class, n_predict = min(n_features_max, 10))
-    # find_cars
+
+    # find_cars 1
     test_FeatureClassification_find_cars_single_image(mpimg.imread('./test_images/test1.jpg'), 
                                                       feat_class,
                                                       ystart = 400,
                                                       ystop = 656,
                                                       scale = 1.5)
+
+    
+    test_FeatureClassification_find_cars_and_draw_boxes_single_image(mpimg.imread('./test_images/test1.jpg'), 
+                                                      feat_class,
+                                                      ystart = 400,
+                                                      ystop = 656,
+                                                      scale = 1.5)
+
+    for file_name in glob.glob('./test_images/test*.jpg'):
+        test_FeatureClassification_find_cars_and_draw_boxes_single_image(mpimg.imread(file_name), 
+                                                          feat_class,
+                                                          ystart = 400,
+                                                          ystop = 656,
+                                                          scale = 1.5)
 
