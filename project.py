@@ -364,12 +364,12 @@ if __name__ == '__main__':
                                  pix_per_cell = 16,
                                  cell_per_block = 2,
                                  hog_channel = 'ALL') # Can be 0, 1, 2, or "ALL"    
-    #test_train_classifier(cars[0:min(1000, len(cars))],
-    #                      notcars[0:min(1000, len(notcars))],
-    #                      args,
-    #                      n_predict=100)
-
-    test_train_classifier(cars,
-                          notcars,
+    test_train_classifier(cars[0:min(1000, len(cars))],
+                          notcars[0:min(1000, len(notcars))],
                           args,
                           n_predict=100)
+
+    #test_train_classifier(cars,
+    #                      notcars,
+    #                      args,
+    #                      n_predict=100)
