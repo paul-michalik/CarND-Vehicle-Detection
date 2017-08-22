@@ -123,7 +123,7 @@ class FeatureClassification:
             self.classifier = svc
         # add other alternatives
 
-    def find_cars(self, image, ystart, ystop, scale, classifier='LinearSVC', show_all_rectangles=False):
+    def find_cars(self, image, ystart, ystop, scale, xstart=0, classifier='LinearSVC', show_all_rectangles=False):
         cspace=self.features.args.colorspace
         hog_channel=self.features.args.hog_channel
         svc = self.classifier
@@ -134,7 +134,7 @@ class FeatureClassification:
         spatial_size=self.features.args.spatial_size
         hist_bins=self.features.args.hist_bins
 
-        return find_cars(img=image, ystart=ystart, ystop=ystop, scale=scale, cspace=cspace, hog_channel=hog_channel, svc=svc, X_scaler=X_scaler, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, spatial_size=spatial_size,hist_bins=hist_bins, show_all_rectangles=show_all_rectangles)
+        return find_cars(img=image, xstart=xstart, ystart=ystart, ystop=ystop, scale=scale, cspace=cspace, hog_channel=hog_channel, svc=svc, X_scaler=X_scaler, orient=orient, pix_per_cell=pix_per_cell, cell_per_block=cell_per_block, spatial_size=spatial_size,hist_bins=hist_bins, show_all_rectangles=show_all_rectangles)
 
     def find_cars_and_store_boxes(self, image, ystart, ystop, scale, classifier='LinearSVC', show_all_rectangles=False):
         self.boxes.extend(self.find_cars(image, ystart, ystop, scale, classifier, show_all_rectangles))
@@ -237,7 +237,7 @@ def extract_features(imgs,
 
 # Define a single function that can extract features using hog sub-sampling and make predictions
 def find_cars(img, ystart, ystop, scale, cspace, hog_channel, svc, X_scaler, orient, 
-              pix_per_cell, cell_per_block, spatial_size, hist_bins, show_all_rectangles=False):
+              pix_per_cell, cell_per_block, spatial_size, hist_bins, xstart=0, show_all_rectangles=False):
 
     # array of rectangles where cars were detected
     rectangles = []
@@ -290,7 +290,9 @@ def find_cars(img, ystart, ystop, scale, cspace, hog_channel, svc, X_scaler, ori
         hog2 = get_hog_features(ch2, orient, pix_per_cell, cell_per_block, feature_vec=False)
         hog3 = get_hog_features(ch3, orient, pix_per_cell, cell_per_block, feature_vec=False)
     
-    for xb in range(nxsteps):
+    #print(xstart, nxsteps)
+    for xb in range(xstart, nxsteps):
+        #print(xb)
         for yb in range(nysteps):
             ypos = yb*cells_per_step
             xpos = xb*cells_per_step
@@ -314,17 +316,17 @@ def find_cars(img, ystart, ystop, scale, cspace, hog_channel, svc, X_scaler, ori
             #hist_features = color_hist(subimg, nbins=hist_bins)
 
             # Scale features and make a prediction
-            test_features = X_scaler.transform(np.hstack(hog_features).reshape(1, -1)) 
-            test_prediction = svc.predict(test_features)
-             
-            #test_prediction = svc.predict(hog_features)
+            if X_scaler != None:
+                test_features = X_scaler.transform(np.hstack(hog_features).reshape(1, -1)) 
+                test_prediction = svc.predict(test_features)
+            else:
+                test_prediction = svc.predict(hog_features)
             
             if test_prediction == 1 or show_all_rectangles:
                 xbox_left = np.int(xleft*scale)
                 ytop_draw = np.int(ytop*scale)
                 win_draw = np.int(window*scale)
                 yield ((xbox_left, ytop_draw+ystart),(xbox_left+win_draw,ytop_draw+win_draw+ystart))
-                #rectangles.append(((xbox_left, ytop_draw+ystart),(xbox_left+win_draw,ytop_draw+win_draw+ystart)))
                 
     #return rectangles
 
@@ -472,11 +474,13 @@ def test_FeatureClassification_find_cars_and_draw_boxes_single_image(test_image,
     plt.imshow(test_img_rects)
     plt.show()
 
-def test_FeatureClassification_find_cars_multi_scale_single_image(test_image,                                                                                                              feat_class = FeatureClassification()):
+def test_FeatureClassification_find_cars_multi_scale_single_image(test_image, 
+                                                                  feat_class = FeatureClassification(), 
+                                                                  xstart=0):
 
     rectangles = []
     for ystart, ystop, scale in [(400, 464, 1.0), (416, 480, 1.0), (400, 496, 1.5), (432, 528, 1.5), (400, 528, 2.0), (432, 560, 2.0), (400, 596, 3.5), (464, 660, 3.5)]:
-        cur_rectangles = list(feat_class.find_cars(test_image, ystart, ystop, scale))
+        cur_rectangles = list(feat_class.find_cars(test_image, xstart=xstart, ystart=ystart, ystop=ystop, scale=scale))
         print('{} rectangles found in image for ystart = {}, ystop = {}, scale = {}'.format(len(cur_rectangles),
                                                                                             ystart,
                                                                                             ystop, 
@@ -575,4 +579,9 @@ if __name__ == '__main__':
                                                           ystop = 656,
                                                           scale = 1.5)
 
-    test_FeatureClassification_find_cars_multi_scale_single_image(mpimg.imread('./test_images/test1.jpg'), feat_class)
+    test_FeatureClassification_find_cars_multi_scale_single_image(mpimg.imread('./test_images/test1.jpg'), feat_class, xstart=6)
+
+    for file_name in glob.glob('./test_images/test*.jpg'):
+        test_FeatureClassification_find_cars_multi_scale_single_image(mpimg.imread(file_name), 
+                                                          feat_class,
+                                                          xstart=6)
