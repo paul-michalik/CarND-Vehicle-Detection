@@ -316,9 +316,9 @@ def find_cars(img, ystart, ystop, scale, cspace, hog_channel, svc, X_scaler, ori
             #hist_features = color_hist(subimg, nbins=hist_bins)
 
             # Scale features and make a prediction
+            hog_features = np.hstack(hog_features).reshape(1, -1)
             if X_scaler != None:
-                test_features = X_scaler.transform(np.hstack(hog_features).reshape(1, -1)) 
-                test_prediction = svc.predict(test_features)
+                test_prediction = svc.predict(X_scaler.transform(hog_features))
             else:
                 test_prediction = svc.predict(hog_features)
             
@@ -539,13 +539,21 @@ if __name__ == '__main__':
     #                                        args,
     #                                        scale=True)
 
-    feat_ext = FeatureExtraction(FeatureExtractionArgs(colorspace = 'YUV',
-                                                       orient = 11,
-                                                       pix_per_cell = 16,
-                                                       cell_per_block = 2,
-                                                       hog_channel = 'ALL'))
+    args = FeatureExtractionArgs(colorspace = 'YUV', # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+                                 orient = 11,
+                                 pix_per_cell = 16,
+                                 cell_per_block = 2,
+                                 hog_channel = 'ALL') # Can be 0, 1, 2, or "ALL"
+
+    #args = FeatureExtractionArgs(colorspace = 'YCrCb', # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+    #                             orient = 8,
+    #                             pix_per_cell = 8,
+    #                             cell_per_block = 1,
+    #                             hog_channel = 'ALL') # Can be 0, 1, 2, or "ALL"
+
+    feat_ext = FeatureExtraction(args)
     feat_ext.extract_features(cars, notcars)
-    feat_ext.prepare_features(scale=True)
+    feat_ext.prepare_features(scale=False)
     
     #test_FeatureClassification_train_classifier(feat_ext, n_predict = min(n_features_max, 10))
 
