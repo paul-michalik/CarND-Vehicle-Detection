@@ -8,6 +8,15 @@ from sklearn.svm import LinearSVC
 from sklearn.preprocessing import StandardScaler
 from skimage.feature import hog
 from sklearn.model_selection import train_test_split
+from scipy.ndimage.measurements import label
+
+# Import Video clip creator
+import imageio as imageio
+imageio.plugins.ffmpeg.download()
+from moviepy.editor import ImageSequenceClip
+# Import everything needed to edit/save/watch video clips
+from moviepy.editor import VideoFileClip
+from IPython.display import HTML
 
 class FeatureExtractionArgs:
     colorspace = None
@@ -374,7 +383,61 @@ def apply_threshold(heatmap, threshold):
     # Return thresholded map
     return heatmap
 
+def draw_labeled_boxes(img, labels):
+    # Iterate through all detected cars
+    rects = []
+    for car_number in range(1, labels[1]+1):
+        # Find pixels with each car_number label value
+        nonzero = (labels[0] == car_number).nonzero()
+        # Identify x and y values of those pixels
+        nonzeroy = np.array(nonzero[0])
+        nonzerox = np.array(nonzero[1])
+        # Define a bounding box based on min/max x and y
+        bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
+        rects.append(bbox)
+        # Draw the box on the image
+        cv2.rectangle(img, bbox[0], bbox[1], (0,0,255), 6)
+    # Return the image and final rectangles
+    return img, rects
+
+g_feat_class = FeatureClassification()
+g_threshold = 1
+
+def process_image(image):
+    global g_feat_class
+    global g_threshold
+
+    boxes = g_feat_class.find_cars_multiscale(image)
+    labels = label(apply_threshold(add_heat(np.zeros_like(image[:,:,0]), boxes), g_threshold)) 
+    draw_img, bboxes = draw_labeled_boxes(np.copy(image), labels)
+    return draw_img
+
 # Tests. No logic beyond this point.
+
+def test_find_cars_on_video(feat_class = FeatureClassification(),
+                            video_fname = "project_video"):
+    global g_feat_class
+
+    g_feat_class = feat_class
+
+    output = 'output_' + video_fname + '.mp4'
+    input = video_fname + '.mp4'
+
+    # delete output if exists
+    if os.path.exists(output):
+        os.remove(output)
+
+    print(input, output)
+
+    clip, output_clip = None, None
+    try:
+        clip = VideoFileClip(input)
+        output_clip = clip.fl_image(process_image) #NOTE: this function expects color images!!
+    finally:
+        if output_clip != None:
+            output_clip.write_videofile(output, audio=False)
+            output_clip.reader.close()
+            output_clip.audio.reader.close_proc()
 
 def test_get_hog_features(car_img, noncar_img, figsize=(7,7), fontsize=16):
     orient = 9
@@ -530,13 +593,44 @@ def test_FeatureClassification_find_cars_multiscale_auto(test_image,
     plt.figure(figsize=(10,10))
     plt.imshow(test_img_rects)
 
-def test_FeatureClassification_heat_map(test_img, feat_class = FeatureClassification(), xstart=0):
+def test_heatmap(test_img, boxes = []):
     heatmap_img = np.zeros_like(test_img[:,:,0])
-    heatmap_img = add_heat(heatmap_img, feat_class.find_cars_multiscale(test_img, xstart=xstart))
+    heatmap_img = add_heat(heatmap_img, boxes)
     plt.figure(figsize=(10,10))
     plt.imshow(heatmap_img, cmap='hot')
 
+def test_heatmap_threshold(test_img, boxes = [], threshold = 1):
+    heatmap_img = np.zeros_like(test_img[:,:,0])
+    heatmap_img = add_heat(heatmap_img, boxes)
+    heatmap_img = apply_threshold(heatmap_img, threshold)
+    plt.figure(figsize=(10,10))
+    plt.imshow(heatmap_img, cmap='hot')
 
+def test_heatmap_threshold_labels(test_img, boxes = [], threshold = 1):
+    heatmap_img = np.zeros_like(test_img[:,:,0])
+    heatmap_img = add_heat(heatmap_img, boxes)
+    heatmap_img = apply_threshold(heatmap_img, threshold) 
+    labels = label(heatmap_img)
+
+    f, (ax1, ax2) = plt.subplots(1, 2, figsize=(10,10))
+    f.subplots_adjust(hspace = .4, wspace=.2)
+    ax1.imshow(test_img)
+    ax1.set_title('Car Image', fontsize=16)
+    ax2.imshow(labels[0], cmap='gray')
+    ax2.set_title('Labels', fontsize=16) 
+    plt.show()
+
+def test_heatmap_boxes_on_image(test_img, boxes = [], threshold = 1):
+    heatmap_img = np.zeros_like(test_img[:,:,0])
+    heatmap_img = add_heat(heatmap_img, boxes)
+    heatmap_img = apply_threshold(heatmap_img, threshold) 
+    labels = label(heatmap_img)
+    
+    draw_img, rect = draw_labeled_boxes(np.copy(test_img), labels)
+    # Display the image
+    plt.figure(figsize=(10,10))
+    plt.imshow(draw_img)
+    
 if __name__ == '__main__':
     cars = glob.glob('vehicles/*/*.png')
     notcars = glob.glob('non-vehicles/*/*.png')
@@ -611,17 +705,17 @@ if __name__ == '__main__':
     #test_FeatureClassification_with_trained_classifier(feat_class, n_predict = min(n_features_max, 10))
 
     # find_cars 1
-    test_FeatureClassification_find_cars_single_image(mpimg.imread('./test_images/test1.jpg'), 
-                                                      feat_class,
-                                                      ystart = 400,
-                                                      ystop = 656,
-                                                      scale = 1.5)
+    #test_FeatureClassification_find_cars_single_image(mpimg.imread('./test_images/test1.jpg'), 
+    #                                                  feat_class,
+    #                                                  ystart = 400,
+    #                                                  ystop = 656,
+    #                                                  scale = 1.5)
     
-    test_FeatureClassification_find_cars_and_draw_boxes_single_image(mpimg.imread('./test_images/test1.jpg'), 
-                                                      feat_class,
-                                                      ystart = 400,
-                                                      ystop = 656,
-                                                      scale = 1.5)
+    #test_FeatureClassification_find_cars_and_draw_boxes_single_image(mpimg.imread('./test_images/test1.jpg'), 
+    #                                                  feat_class,
+    #                                                  ystart = 400,
+    #                                                  ystop = 656,
+    #                                                  scale = 1.5)
 
     #for file_name in glob.glob('./test_images/test*.jpg'):
     #    test_FeatureClassification_find_cars_and_draw_boxes_single_image(mpimg.imread(file_name), 
@@ -630,12 +724,29 @@ if __name__ == '__main__':
     #                                                      ystop = 656,
     #                                                      scale = 1.5)
 
-    test_FeatureClassification_find_cars_multiscale(mpimg.imread('./test_images/test1.jpg'), feat_class, xstart=6)
+    #test_FeatureClassification_find_cars_multiscale(mpimg.imread('./test_images/test1.jpg'), feat_class, xstart=6)
 
-    for file_name in glob.glob('./test_images/test*.jpg'):
-        test_FeatureClassification_find_cars_multiscale(mpimg.imread(file_name), 
-                                                          feat_class,
-                                                          xstart=6)
-    test_FeatureClassification_find_cars_multiscale_auto(mpimg.imread('./test_images/test1.jpg'), feat_class, xstart=6)
+    #for file_name in glob.glob('./test_images/test*.jpg'):
+    #    test_FeatureClassification_find_cars_multiscale(mpimg.imread(file_name), 
+    #                                                      feat_class,
+    #                                                      xstart=6)
+    #test_FeatureClassification_find_cars_multiscale_auto(mpimg.imread('./test_images/test1.jpg'), feat_class, xstart=6)
 
-    test_FeatureClassification_heat_map(mpimg.imread('./test_images/test1.jpg'), feat_class, xstart=6)
+    ## heatmaps
+    #test_img = mpimg.imread('./test_images/test1.jpg')
+    #boxes = feat_class.find_cars_multiscale(test_img, xstart=0)
+    #test_heatmap(test_img, boxes)
+    #test_heatmap_threshold(test_img, boxes, threshold = 1)
+    #test_heatmap_threshold_labels(test_img, boxes, threshold = 1)
+
+    #for file_name in glob.glob('./test_images/test*.jpg'):
+    #    test_img = mpimg.imread(file_name)
+    #    boxes = feat_class.find_cars_multiscale(test_img, xstart=0)
+    #    test_heatmap_threshold_labels(test_img, boxes, threshold = 1)
+    
+    #for file_name in glob.glob('./test_images/test*.jpg'):
+    #    test_img = mpimg.imread(file_name)
+    #    boxes = feat_class.find_cars_multiscale(test_img, xstart=0)
+    #    test_heatmap_boxes_on_image(test_img, boxes, threshold = 1)
+    
+    test_find_cars_on_video(feat_class, 'project_video')
