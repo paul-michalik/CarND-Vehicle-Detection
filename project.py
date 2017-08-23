@@ -419,7 +419,7 @@ def process_image(image):
     if g_use_history == True:
         if len(boxes) > 0:
             g_boxes.append(boxes)
-            # forget the oldest "g_boxes_limit" boxes 
+            # forget the half of the oldest "g_boxes_limit" boxes 
             if len(g_boxes) > g_boxes_limit:
                 print("Resetting first {} boxes:".format(g_boxes_limit//2))
                 g_boxes = g_boxes[g_boxes_limit//2:]
@@ -709,7 +709,11 @@ def test_heatmap_boxes_on_image(test_img, boxes = [], threshold = 1):
 if __name__ == '__main__':
     cars = glob.glob('vehicles/*/*.png')
     notcars = glob.glob('non-vehicles/*/*.png')
-    
+    # skip every n-th image, otherwise we're too slow... :-(
+    skip_n = 3
+    cars = cars[::skip_n]
+    notcars = notcars[::skip_n]
+
     n_features_max = min(100, min(len(cars), len(notcars)))
     n_predict_max = min(50, n_features_max/2)
 
@@ -719,24 +723,24 @@ if __name__ == '__main__':
     # ---> image2
     test_get_hog_features(mpimg.imread(cars[5]), mpimg.imread(notcars[5]))   
 
-    ## Feature extraction parameters
-    #args = FeatureExtractionArgs(colorspace = 'YUV', # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
-    #                             orient = 11,
-    #                             pix_per_cell = 16,
-    #                             cell_per_block = 2,
-    #                             hog_channel = 'ALL') # Can be 0, 1, 2, or "ALL"
+    # Feature extraction parameters
+    args = FeatureExtractionArgs(colorspace = 'YUV', # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+                                 orient = 11,
+                                 pix_per_cell = 16,
+                                 cell_per_block = 2,
+                                 hog_channel = 'ALL') # Can be 0, 1, 2, or "ALL"
     
-    #test_FeatureExtraction_extract_feature_category(cars[0:n_features_max], 
-    #                                                notcars[0:n_features_max],
-    #                                                args)
-    #test_FeatureExtraction_extract_features(cars[0:n_features_max], 
-    #                                        notcars[0:n_features_max],
-    #                                        args)
+    test_FeatureExtraction_extract_feature_category(cars[0:n_features_max], 
+                                                    notcars[0:n_features_max],
+                                                    args)
+    test_FeatureExtraction_extract_features(cars[0:n_features_max], 
+                                            notcars[0:n_features_max],
+                                            args)
 
-    #test_FeatureExtraction_prepare_features(cars[0:n_features_max], 
-    #                                        notcars[0:n_features_max],
-    #                                        args,
-    #                                        scale=True)
+    test_FeatureExtraction_prepare_features(cars[0:n_features_max], 
+                                            notcars[0:n_features_max],
+                                            args,
+                                            scale=True)
 
     args = FeatureExtractionArgs(colorspace = 'YUV', # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
                                  orient = 11,
@@ -748,52 +752,52 @@ if __name__ == '__main__':
     feat_ext.extract_features(cars, notcars)
     feat_ext.prepare_features(scale=False)
     
-    #test_FeatureClassification_train_classifier(feat_ext, n_predict = min(n_features_max, 10))
+    test_FeatureClassification_train_classifier(feat_ext, n_predict = min(n_features_max, 10))
 
     # classifier
     feat_class = FeatureClassification(feat_ext)
     feat_class.train_classifier()
 
     # Trivial function test
-    #test_FeatureClassification_with_trained_classifier(feat_class, n_predict = min(n_features_max, 10))
+    test_FeatureClassification_with_trained_classifier(feat_class, n_predict = min(n_features_max, 10))
 
     # find_cars 1
-    #test_FeatureClassification_find_cars_single_image(mpimg.imread('./test_images/test1.jpg'), 
-    #                                                  feat_class,
-    #                                                  ystart = 400,
-    #                                                  ystop = 656,
-    #                                                  scale = 1.5)
+    test_FeatureClassification_find_cars_single_image(mpimg.imread('./test_images/test1.jpg'), 
+                                                      feat_class,
+                                                      ystart = 400,
+                                                      ystop = 656,
+                                                      scale = 1.5)
     
-    #test_FeatureClassification_find_cars_and_draw_boxes_single_image(mpimg.imread('./test_images/test1.jpg'), 
-    #                                                  feat_class,
-    #                                                  ystart = 400,
-    #                                                  ystop = 656,
-    #                                                  scale = 1.5)
+    test_FeatureClassification_find_cars_and_draw_boxes_single_image(mpimg.imread('./test_images/test1.jpg'), 
+                                                      feat_class,
+                                                      ystart = 400,
+                                                      ystop = 656,
+                                                      scale = 1.5)
 
-    #for file_name in glob.glob('./test_images/test*.jpg'):
-    #    test_FeatureClassification_find_cars_and_draw_boxes_single_image(mpimg.imread(file_name), 
-    #                                                      feat_class,
-    #                                                      ystart = 400,
-    #                                                      ystop = 656,
-    #                                                      scale = 1.5)
+    for file_name in glob.glob('./test_images/test*.jpg'):
+        test_FeatureClassification_find_cars_and_draw_boxes_single_image(mpimg.imread(file_name), 
+                                                          feat_class,
+                                                          ystart = 400,
+                                                          ystop = 656,
+                                                          scale = 1.5)
 
     
-    #test_FeatureClassification_find_cars_multiscale(mpimg.imread('./test_images/test1.jpg'), feat_class, xstart=6)
-    #test_FeatureClassification_find_cars_multiscale(mpimg.imread('./test_images/test2.jpg'), feat_class, xstart=6)
+    test_FeatureClassification_find_cars_multiscale(mpimg.imread('./test_images/test1.jpg'), feat_class, xstart=6)
+    test_FeatureClassification_find_cars_multiscale(mpimg.imread('./test_images/test2.jpg'), feat_class, xstart=6)
 
     # ---> image4
     for file_name in glob.glob('./test_images/test*.jpg'):
         test_FeatureClassification_find_cars_multiscale(mpimg.imread(file_name), 
                                                           feat_class,
                                                           xstart=6)
-    #test_FeatureClassification_find_cars_multiscale_auto(mpimg.imread('./test_images/test1.jpg'), feat_class, xstart=6)
+    test_FeatureClassification_find_cars_multiscale_auto(mpimg.imread('./test_images/test1.jpg'), feat_class, xstart=6)
 
-    ## heatmaps
-    #test_img = mpimg.imread('./test_images/test1.jpg')
-    #boxes = feat_class.find_cars_multiscale(test_img, xstart=0)
-    #test_heatmap(test_img, boxes)
-    #test_heatmap_threshold(test_img, boxes, threshold = 1)
-    #test_heatmap_threshold_labels(test_img, boxes, threshold = 1)
+    # heatmaps
+    test_img = mpimg.imread('./test_images/test1.jpg')
+    boxes = feat_class.find_cars_multiscale(test_img, xstart=0)
+    test_heatmap(test_img, boxes)
+    test_heatmap_threshold(test_img, boxes, threshold = 1)
+    test_heatmap_threshold_labels(test_img, boxes, threshold = 1)
 
     # ---> image5, image6, image7
     test_img = mpimg.imread('./test_images/test1.jpg')
@@ -804,7 +808,7 @@ if __name__ == '__main__':
     test_heatmap_threshold_labels(test_img, boxes, threshold = 1)
     test_heatmap_boxes_on_image(test_img, boxes, threshold = 1)
     
-    #for file_name in glob.glob('./test_images/test*.jpg'):
-    #    test_process_image(mpimg.imread(file_name), feat_class)
+    for file_name in glob.glob('./test_images/test*.jpg'):
+        test_process_image(mpimg.imread(file_name), feat_class)
 
     test_process_image_on_video(feat_class, 'project_video')
