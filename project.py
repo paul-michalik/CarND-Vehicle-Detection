@@ -807,4 +807,4 @@ if __name__ == '__main__':
     #for file_name in glob.glob('./test_images/test*.jpg'):
     #    test_process_image(mpimg.imread(file_name), feat_class)
 
-    #test_process_image_on_video(feat_class, 'project_video', video_clip_interval=(8, 15))
+    test_process_image_on_video(feat_class, 'project_video')
